@@ -738,4 +738,3 @@ class MTGCommanderPicker {
 document.addEventListener('DOMContentLoaded', () => {
     new MTGCommanderPicker();
 });
-});
