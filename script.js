@@ -20,6 +20,11 @@ class MTGCommanderPicker {
         this.cache = new Map();
         this.cacheTimeout = 10 * 60 * 1000; // 10 minutes
         
+        // Commander queue for prefetching
+        this.commanderQueue = [];
+        this.queueSize = 10; // Prefetch 10 commanders at a time
+        this.minQueueSize = 3; // Refill when queue drops below this
+        
         this.initializeEventListeners();
         this.updateManaFilter(); // Initialize mana filter
     }
@@ -359,6 +364,9 @@ class MTGCommanderPicker {
         this.filters.colors = Array.from(this.selectedColors);
         this.filters.bracket = document.getElementById('bracket-filter').value;
         
+        // Clear queue when filters change
+        this.commanderQueue = [];
+        
         // Check cache first
         const cacheKey = this.getCacheKey('commander', this.filters);
         const cachedCommander = this.getFromCache(cacheKey);
@@ -368,6 +376,8 @@ class MTGCommanderPicker {
             document.getElementById('card-section').style.display = 'block';
             document.getElementById('deck-suggestions').style.display = 'none';
             this.displayCommander();
+            // Prefetch more commanders in background
+            this.prefetchCommanders();
             return;
         }
         
@@ -380,16 +390,121 @@ class MTGCommanderPicker {
         document.getElementById('swipe-buttons').style.display = 'none';
         
         try {
-            this.currentCommander = await this.fetchRandomCommander();
-            this.setCache(cacheKey, this.currentCommander);
-            this.displayCommander();
+            // Fetch a batch of commanders
+            await this.prefetchCommanders();
+            
+            // Get the first one from the queue
+            if (this.commanderQueue.length > 0) {
+                this.currentCommander = this.commanderQueue.shift();
+                this.setCache(cacheKey, this.currentCommander);
+                this.displayCommander();
+            } else {
+                throw new Error('No commanders found');
+            }
         } catch (error) {
             console.error('Error fetching commander:', error);
             document.getElementById('loading-screen').innerHTML = '<div style="text-align: center; padding: 40px; color: #ff5252;">❌ Error loading commander. Please try again.</div>';
         }
     }
 
+    async prefetchCommanders() {
+        console.log('Prefetching commanders... Current queue size:', this.commanderQueue.length);
+        
+        // Build Scryfall search query
+        let query = 'is:commander';
+        
+        // Add color filter
+        if (this.filters.colors.length > 0) {
+            const colorQuery = this.filters.colors.join('');
+            query += ` id:${colorQuery}`;
+        }
+        
+        // Add mana value filter
+        query += ` mv>=${this.filters.manaMin} mv<=${this.filters.manaMax}`;
+        
+        // Add bracket filter (approximate mapping)
+        if (this.filters.bracket) {
+            const bracket = parseInt(this.filters.bracket);
+            if (bracket === 1) {
+                query += ' -is:reserved (rarity:common OR rarity:uncommon)';
+            } else if (bracket === 5) {
+                query += ' (is:reserved OR rarity:mythic)';
+            }
+        }
+        
+        console.log('Scryfall query:', query);
+        
+        try {
+            // Use rate-limited Scryfall request
+            const searchParams = {
+                q: query,
+                order: 'random'
+            };
+            
+            const data = await this.rateLimitedScryfallRequest(`${this.scryfallAPI}/cards/search`, searchParams);
+            
+            if (!data.data || data.data.length === 0) {
+                // Fallback to any commander if no results
+                const fallbackParams = {
+                    q: 'is:commander',
+                    order: 'random'
+                };
+                
+                const fallbackData = await this.rateLimitedScryfallRequest(`${this.scryfallAPI}/cards/search`, fallbackParams);
+                
+                if (fallbackData.data && fallbackData.data.length > 0) {
+                    // Process up to queueSize commanders
+                    const commandersToAdd = fallbackData.data.slice(0, this.queueSize);
+                    for (const card of commandersToAdd) {
+                        this.commanderQueue.push(this.processCommanderCard(card));
+                    }
+                    console.log('Prefetched', commandersToAdd.length, 'commanders (fallback)');
+                    return;
+                }
+                
+                throw new Error('No commanders found');
+            }
+            
+            // Process up to queueSize commanders from results
+            const commandersToAdd = data.data.slice(0, this.queueSize);
+            for (const card of commandersToAdd) {
+                this.commanderQueue.push(this.processCommanderCard(card));
+            }
+            
+            console.log('Prefetched', commandersToAdd.length, 'commanders. Queue size:', this.commanderQueue.length);
+            
+        } catch (error) {
+            console.error('Error prefetching commanders:', error);
+            throw error;
+        }
+    }
+
     async fetchRandomCommander() {
+        // Check if we need to refill the queue
+        if (this.commanderQueue.length < this.minQueueSize) {
+            console.log('Queue low, prefetching more commanders...');
+            await this.prefetchCommanders();
+        }
+        
+        // Get next commander from queue
+        if (this.commanderQueue.length > 0) {
+            const commander = this.commanderQueue.shift();
+            console.log('Got commander from queue:', commander.name, '- Remaining in queue:', this.commanderQueue.length);
+            
+            // Prefetch more in background if queue is getting low
+            if (this.commanderQueue.length < this.minQueueSize) {
+                this.prefetchCommanders().catch(err => console.log('Background prefetch failed:', err));
+            }
+            
+            return commander;
+        }
+        
+        // Fallback: fetch one commander directly if queue is empty
+        console.log('Queue empty, fetching single commander...');
+        return await this.fetchSingleCommander();
+    }
+
+    async fetchSingleCommander() {
         // Build Scryfall search query
         let query = 'is:commander';
         
@@ -610,14 +725,28 @@ class MTGCommanderPicker {
     }
 
     displayCommander() {
+        console.log('Displaying commander:', this.currentCommander.name);
+        
+        // Reset loading screen content in case it had an error message
+        const loadingScreen = document.getElementById('loading-screen');
+        loadingScreen.innerHTML = `
+            <div class="loading-spinner"></div>
+            <p>Finding your perfect commander...</p>
+        `;
+        
         // Hide loading, show card
-        document.getElementById('loading-screen').style.display = 'none';
+        loadingScreen.style.display = 'none';
         document.getElementById('swipe-hint').style.display = 'block';
         document.getElementById('card-container').style.display = 'block';
         document.getElementById('swipe-buttons').style.display = 'flex';
         
         const cardContainer = document.getElementById('card-container');
         const commander = this.currentCommander;
+        
+        // Reset container styles completely
+        cardContainer.style.opacity = '1';
+        cardContainer.style.transform = '';
+        cardContainer.style.transition = '';
         
         cardContainer.innerHTML = `
             <div class="commander-card">
@@ -635,6 +764,7 @@ class MTGCommanderPicker {
         `;
         
         // Re-initialize swipe after new card is displayed
+        console.log('Re-initializing swipe for new card');
         this.initializeSwipe();
     }
 
@@ -928,25 +1058,46 @@ class MTGCommanderPicker {
 
     rejectCommander() {
         console.log('Reject commander called');
-        // Smoothly transition to next commander without jarring reload
-        const cardContainer = document.getElementById('card-container');
-        cardContainer.style.opacity = '0';
-        cardContainer.style.transition = 'opacity 0.2s ease-out';
         
-        setTimeout(async () => {
-            // Find a new commander with same filters
-            try {
-                this.currentCommander = await this.fetchRandomCommander();
+        // Show loading state immediately
+        const cardContainer = document.getElementById('card-container');
+        const loadingScreen = document.getElementById('loading-screen');
+        const swipeHint = document.getElementById('swipe-hint');
+        const swipeButtons = document.getElementById('swipe-buttons');
+        
+        // Wait for fly-off animation, then show next commander
+        setTimeout(() => {
+            // Check if we have a commander in the queue
+            if (this.commanderQueue.length > 0) {
+                console.log('Getting commander from queue. Remaining:', this.commanderQueue.length);
+                this.currentCommander = this.commanderQueue.shift();
                 this.displayCommander();
-                // Fade back in
-                setTimeout(() => {
-                    cardContainer.style.opacity = '1';
-                }, 50);
-            } catch (error) {
-                console.error('Error fetching new commander:', error);
-                cardContainer.style.opacity = '1';
+                
+                // Prefetch more in background if queue is getting low
+                if (this.commanderQueue.length < this.minQueueSize) {
+                    console.log('Queue low, prefetching in background...');
+                    this.prefetchCommanders().catch(err => console.log('Background prefetch failed:', err));
+                }
+            } else {
+                // Queue is empty, show loading and fetch
+                cardContainer.style.display = 'none';
+                swipeHint.style.display = 'none';
+                swipeButtons.style.display = 'none';
+                loadingScreen.style.display = 'block';
+                
+                // Fetch new commander
+                this.fetchRandomCommander()
+                    .then(commander => {
+                        console.log('New commander fetched:', commander.name);
+                        this.currentCommander = commander;
+                        this.displayCommander();
+                    })
+                    .catch(error => {
+                        console.error('Error fetching new commander:', error);
+                        loadingScreen.innerHTML = '<div style="text-align: center; padding: 40px; color: #ff5252;">❌ Error loading commander. Please try again.</div>';
+                    });
             }
-        }, 200);
+        }, 350); // Wait for fly-off animation to complete
     }
 
     resetToFilters() {

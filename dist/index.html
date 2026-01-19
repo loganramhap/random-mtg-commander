@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTG Commander Picker</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.scryfall.io https://*.scryfall.com; connect-src 'self' https://api.scryfall.com https://cards.scryfall.io https://api.allorigins.win;">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎯</text></svg>">
+  <script type="module" crossorigin src="/assets/index-BO1UA5ep.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-BaGuAtTA.css">
+</head>
+<body>
+    <div class="app">
+        <header>
+            <h1>🎯 MTG Commander Picker</h1>
+            <p>Find your next commander with style!</p>
+        </header>
+
+        <div class="filters-section">
+            <div class="filter-group">
+                <label>Colors:</label>
+                <div class="color-filters">
+                    <button class="color-btn" data-color="W">⚪</button>
+                    <button class="color-btn" data-color="U">🔵</button>
+                    <button class="color-btn" data-color="B">⚫</button>
+                    <button class="color-btn" data-color="R">🔴</button>
+                    <button class="color-btn" data-color="G">🟢</button>
+                    <button class="color-btn colorless" data-color="C">◯</button>
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <label>Bracket Level:</label>
+                <select id="bracket-filter">
+                    <option value="">Any</option>
+                    <option value="1">Bracket 1</option>
+                    <option value="2">Bracket 2</option>
+                    <option value="3">Bracket 3</option>
+                    <option value="4">Bracket 4</option>
+                    <option value="5">Bracket 5 (cEDH)</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label>Mana Value:</label>
+                <div class="mana-value-options">
+                    <div class="mana-option">
+                        <input type="radio" id="mana-any" name="mana-filter" value="any" checked>
+                        <label for="mana-any">Any</label>
+                    </div>
+                    <div class="mana-option">
+                        <input type="radio" id="mana-low" name="mana-filter" value="low">
+                        <label for="mana-low">Low (1-3)</label>
+                    </div>
+                    <div class="mana-option">
+                        <input type="radio" id="mana-mid" name="mana-filter" value="mid">
+                        <label for="mana-mid">Mid (4-6)</label>
+                    </div>
+                    <div class="mana-option">
+                        <input type="radio" id="mana-high" name="mana-filter" value="high">
+                        <label for="mana-high">High (7+)</label>
+                    </div>
+                    <div class="mana-option">
+                        <input type="radio" id="mana-custom" name="mana-filter" value="custom">
+                        <label for="mana-custom">Custom:</label>
+                    </div>
+                </div>
+                <div class="custom-mana-controls" id="custom-mana-controls" style="display: none;">
+                    <div class="mana-inputs">
+                        <div class="mana-input-group">
+                            <label for="mana-min-input">Min:</label>
+                            <input type="number" id="mana-min-input" min="0" max="15" value="1">
+                        </div>
+                        <div class="mana-input-group">
+                            <label for="mana-max-input">Max:</label>
+                            <input type="number" id="mana-max-input" min="0" max="15" value="10">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button id="apply-filters" class="apply-btn">Find Commander</button>
+        </div>
+
+        <div class="card-section" id="card-section" style="display: none;">
+            <div class="loading-screen" id="loading-screen">
+                <div class="loading-spinner"></div>
+                <p>Finding your perfect commander...</p>
+            </div>
+            <div class="swipe-hint" id="swipe-hint" style="display: none;">
+                <p>👈 Swipe left to pass • Swipe right to pick 👉</p>
+            </div>
+            <div class="card-container" id="card-container" style="display: none;">
+                <div class="commander-card" id="commander-card">
+                    <img id="card-image" src="" alt="Commander card">
+                    <div class="card-info">
+                        <h2 id="card-name"></h2>
+                        <p id="card-type"></p>
+                        <div class="explanation" id="explanation"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="swipe-buttons" id="swipe-buttons" style="display: none;">
+                <button class="swipe-btn reject" id="reject-btn">👎 Pass</button>
+                <button class="swipe-btn accept" id="accept-btn">👍 Pick This!</button>
+            </div>
+        </div>
+
+        <div class="deck-suggestions" id="deck-suggestions" style="display: none;">
+            <h2>🎉 Great Choice!</h2>
+            <div id="deck-content"></div>
+            <button id="new-search" class="apply-btn">Find Another Commander</button>
+        </div>
+    </div>
+
+</body>
+</html>
