@@ -21,7 +21,7 @@ class MTGCommanderPicker {
         this.cacheTimeout = 10 * 60 * 1000; // 10 minutes
         
         this.initializeEventListeners();
-        this.updateManaRange();
+        this.updateManaFilter(); // Initialize mana filter
     }
 
     initializeEventListeners() {
@@ -30,22 +30,168 @@ class MTGCommanderPicker {
             btn.addEventListener('click', (e) => this.toggleColor(e.target.dataset.color));
         });
 
-        // Mana value sliders
-        const manaMin = document.getElementById('mana-min');
-        const manaMax = document.getElementById('mana-max');
-        
-        manaMin.addEventListener('input', () => this.updateManaRange());
-        manaMax.addEventListener('input', () => this.updateManaRange());
+        // Mana value radio buttons
+        document.querySelectorAll('input[name="mana-filter"]').forEach(radio => {
+            radio.addEventListener('change', () => this.updateManaFilter());
+        });
+
+        // Custom mana value inputs
+        document.getElementById('mana-min-input').addEventListener('input', () => this.updateCustomManaValues());
+        document.getElementById('mana-max-input').addEventListener('input', () => this.updateCustomManaValues());
 
         // Apply filters button
         document.getElementById('apply-filters').addEventListener('click', () => this.findCommander());
 
-        // Swipe buttons
+        // Swipe buttons (fallback)
         document.getElementById('reject-btn').addEventListener('click', () => this.rejectCommander());
         document.getElementById('accept-btn').addEventListener('click', () => this.acceptCommander());
 
         // New search button
         document.getElementById('new-search').addEventListener('click', () => this.resetToFilters());
+        
+        // Initialize swipe functionality
+        this.initializeSwipe();
+    }
+
+    initializeSwipe() {
+        const cardContainer = document.getElementById('card-container');
+        let startX = 0;
+        let startY = 0;
+        let currentX = 0;
+        let currentY = 0;
+        let isDragging = false;
+
+        // Mouse events
+        cardContainer.addEventListener('mousedown', (e) => {
+            if (e.target.closest('.commander-card')) {
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                cardContainer.style.cursor = 'grabbing';
+            }
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            
+            currentX = e.clientX - startX;
+            currentY = e.clientY - startY;
+            
+            const card = cardContainer.querySelector('.commander-card');
+            if (card) {
+                const rotation = currentX / 20; // Subtle rotation effect
+                card.style.transform = `translate(${currentX}px, ${currentY}px) rotate(${rotation}deg)`;
+                card.style.transition = 'none';
+                
+                // Visual feedback
+                if (Math.abs(currentX) > 50) {
+                    if (currentX > 0) {
+                        card.style.borderColor = '#4caf50'; // Green for accept
+                    } else {
+                        card.style.borderColor = '#ff5252'; // Red for reject
+                    }
+                }
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (!isDragging) return;
+            
+            isDragging = false;
+            cardContainer.style.cursor = 'grab';
+            
+            const card = cardContainer.querySelector('.commander-card');
+            if (card) {
+                // Check if swipe was significant enough
+                if (Math.abs(currentX) > 100) {
+                    // Animate card flying off screen
+                    const direction = currentX > 0 ? 1 : -1;
+                    card.style.transition = 'transform 0.3s ease-out, opacity 0.3s ease-out';
+                    card.style.transform = `translate(${direction * 1000}px, ${currentY}px) rotate(${direction * 30}deg)`;
+                    card.style.opacity = '0';
+                    
+                    setTimeout(() => {
+                        if (currentX > 0) {
+                            this.acceptCommander();
+                        } else {
+                            this.rejectCommander();
+                        }
+                    }, 300);
+                } else {
+                    // Snap back to center
+                    card.style.transition = 'transform 0.3s ease-out, border-color 0.3s ease-out';
+                    card.style.transform = 'translate(0, 0) rotate(0deg)';
+                    card.style.borderColor = 'transparent';
+                }
+            }
+            
+            currentX = 0;
+            currentY = 0;
+        });
+
+        // Touch events
+        cardContainer.addEventListener('touchstart', (e) => {
+            if (e.target.closest('.commander-card')) {
+                isDragging = true;
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+            }
+        });
+
+        cardContainer.addEventListener('touchmove', (e) => {
+            if (!isDragging) return;
+            
+            e.preventDefault();
+            currentX = e.touches[0].clientX - startX;
+            currentY = e.touches[0].clientY - startY;
+            
+            const card = cardContainer.querySelector('.commander-card');
+            if (card) {
+                const rotation = currentX / 20;
+                card.style.transform = `translate(${currentX}px, ${currentY}px) rotate(${rotation}deg)`;
+                card.style.transition = 'none';
+                
+                // Visual feedback
+                if (Math.abs(currentX) > 50) {
+                    if (currentX > 0) {
+                        card.style.borderColor = '#4caf50';
+                    } else {
+                        card.style.borderColor = '#ff5252';
+                    }
+                }
+            }
+        });
+
+        cardContainer.addEventListener('touchend', () => {
+            if (!isDragging) return;
+            
+            isDragging = false;
+            
+            const card = cardContainer.querySelector('.commander-card');
+            if (card) {
+                if (Math.abs(currentX) > 100) {
+                    const direction = currentX > 0 ? 1 : -1;
+                    card.style.transition = 'transform 0.3s ease-out, opacity 0.3s ease-out';
+                    card.style.transform = `translate(${direction * 1000}px, ${currentY}px) rotate(${direction * 30}deg)`;
+                    card.style.opacity = '0';
+                    
+                    setTimeout(() => {
+                        if (currentX > 0) {
+                            this.acceptCommander();
+                        } else {
+                            this.rejectCommander();
+                        }
+                    }, 300);
+                } else {
+                    card.style.transition = 'transform 0.3s ease-out, border-color 0.3s ease-out';
+                    card.style.transform = 'translate(0, 0) rotate(0deg)';
+                    card.style.borderColor = 'transparent';
+                }
+            }
+            
+            currentX = 0;
+            currentY = 0;
+        });
     }
 
     toggleColor(color) {
@@ -128,26 +274,57 @@ class MTGCommanderPicker {
         }
     }
 
-    updateManaRange() {
-        const manaMin = document.getElementById('mana-min');
-        const manaMax = document.getElementById('mana-max');
-        const rangeDisplay = document.getElementById('mana-range');
+    updateManaFilter() {
+        const selectedFilter = document.querySelector('input[name="mana-filter"]:checked').value;
+        const customControls = document.getElementById('custom-mana-controls');
         
-        let min = parseInt(manaMin.value);
-        let max = parseInt(manaMax.value);
+        // Show/hide custom controls
+        if (selectedFilter === 'custom') {
+            customControls.style.display = 'block';
+            this.updateCustomManaValues();
+        } else {
+            customControls.style.display = 'none';
+            
+            // Set predefined ranges
+            switch (selectedFilter) {
+                case 'any':
+                    this.filters.manaMin = 0;
+                    this.filters.manaMax = 15;
+                    break;
+                case 'low':
+                    this.filters.manaMin = 1;
+                    this.filters.manaMax = 3;
+                    break;
+                case 'mid':
+                    this.filters.manaMin = 4;
+                    this.filters.manaMax = 6;
+                    break;
+                case 'high':
+                    this.filters.manaMin = 7;
+                    this.filters.manaMax = 15;
+                    break;
+            }
+        }
+    }
+
+    updateCustomManaValues() {
+        const minInput = document.getElementById('mana-min-input');
+        const maxInput = document.getElementById('mana-max-input');
+        
+        let min = parseInt(minInput.value);
+        let max = parseInt(maxInput.value);
         
         // Ensure min doesn't exceed max
         if (min > max) {
-            if (manaMin === document.activeElement) {
+            if (document.activeElement === minInput) {
                 max = min;
-                manaMax.value = max;
+                maxInput.value = max;
             } else {
                 min = max;
-                manaMin.value = min;
+                minInput.value = min;
             }
         }
         
-        rangeDisplay.textContent = `${min} - ${max}`;
         this.filters.manaMin = min;
         this.filters.manaMax = max;
     }

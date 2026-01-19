@@ -41,10 +41,40 @@
             </div>
 
             <div class="filter-group">
-                <label>Mana Value: <span id="mana-range">1 - 10</span></label>
-                <div class="range-slider">
-                    <input type="range" id="mana-min" min="0" max="15" value="1">
-                    <input type="range" id="mana-max" min="0" max="15" value="10">
+                <label>Mana Value:</label>
+                <div class="mana-value-options">
+                    <div class="mana-option">
+                        <input type="radio" id="mana-any" name="mana-filter" value="any" checked>
+                        <label for="mana-any">Any</label>
+                    </div>
+                    <div class="mana-option">
+                        <input type="radio" id="mana-low" name="mana-filter" value="low">
+                        <label for="mana-low">Low (1-3)</label>
+                    </div>
+                    <div class="mana-option">
+                        <input type="radio" id="mana-mid" name="mana-filter" value="mid">
+                        <label for="mana-mid">Mid (4-6)</label>
+                    </div>
+                    <div class="mana-option">
+                        <input type="radio" id="mana-high" name="mana-filter" value="high">
+                        <label for="mana-high">High (7+)</label>
+                    </div>
+                    <div class="mana-option">
+                        <input type="radio" id="mana-custom" name="mana-filter" value="custom">
+                        <label for="mana-custom">Custom:</label>
+                    </div>
+                </div>
+                <div class="custom-mana-controls" id="custom-mana-controls" style="display: none;">
+                    <div class="mana-inputs">
+                        <div class="mana-input-group">
+                            <label for="mana-min-input">Min:</label>
+                            <input type="number" id="mana-min-input" min="0" max="15" value="1">
+                        </div>
+                        <div class="mana-input-group">
+                            <label for="mana-max-input">Max:</label>
+                            <input type="number" id="mana-max-input" min="0" max="15" value="10">
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -52,6 +82,9 @@
         </div>
 
         <div class="card-section" id="card-section" style="display: none;">
+            <div class="swipe-hint">
+                <p>👈 Swipe left to pass • Swipe right to pick 👉</p>
+            </div>
             <div class="card-container" id="card-container">
                 <div class="commander-card" id="commander-card">
                     <img id="card-image" src="" alt="Commander card">
