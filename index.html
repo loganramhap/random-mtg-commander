@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MTG Commander Picker</title>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: *.scryfall.com; connect-src 'self' *.scryfall.com api.allorigins.win;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.scryfall.io https://*.scryfall.com; connect-src 'self' https://api.scryfall.com https://cards.scryfall.io https://api.allorigins.win;">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎯</text></svg>">
     <link rel="stylesheet" href="/style.css">
 </head>
@@ -82,10 +82,14 @@
         </div>
 
         <div class="card-section" id="card-section" style="display: none;">
-            <div class="swipe-hint">
+            <div class="loading-screen" id="loading-screen">
+                <div class="loading-spinner"></div>
+                <p>Finding your perfect commander...</p>
+            </div>
+            <div class="swipe-hint" id="swipe-hint" style="display: none;">
                 <p>👈 Swipe left to pass • Swipe right to pick 👉</p>
             </div>
-            <div class="card-container" id="card-container">
+            <div class="card-container" id="card-container" style="display: none;">
                 <div class="commander-card" id="commander-card">
                     <img id="card-image" src="" alt="Commander card">
                     <div class="card-info">
@@ -96,7 +100,7 @@
                 </div>
             </div>
 
-            <div class="swipe-buttons">
+            <div class="swipe-buttons" id="swipe-buttons" style="display: none;">
                 <button class="swipe-btn reject" id="reject-btn">👎 Pass</button>
                 <button class="swipe-btn accept" id="accept-btn">👍 Pick This!</button>
             </div>

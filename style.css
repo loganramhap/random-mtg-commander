@@ -184,6 +184,32 @@ header h1 {
     margin-bottom: 20px;
 }
 
+.loading-screen {
+    text-align: center;
+    padding: 60px 20px;
+}
+
+.loading-spinner {
+    width: 60px;
+    height: 60px;
+    border: 6px solid #f3f3f3;
+    border-top: 6px solid #667eea;
+    border-radius: 50%;
+    margin: 0 auto 20px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading-screen p {
+    color: #667eea;
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+
 .swipe-hint {
     text-align: center;
     margin-bottom: 15px;

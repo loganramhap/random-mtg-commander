@@ -348,9 +348,10 @@ class MTGCommanderPicker {
         // Show loading state
         document.getElementById('card-section').style.display = 'block';
         document.getElementById('deck-suggestions').style.display = 'none';
-        
-        const cardContainer = document.getElementById('card-container');
-        cardContainer.innerHTML = '<div style="text-align: center; padding: 40px;">🎲 Searching Scryfall for commanders...</div>';
+        document.getElementById('loading-screen').style.display = 'block';
+        document.getElementById('swipe-hint').style.display = 'none';
+        document.getElementById('card-container').style.display = 'none';
+        document.getElementById('swipe-buttons').style.display = 'none';
         
         try {
             this.currentCommander = await this.fetchRandomCommander();
@@ -358,7 +359,7 @@ class MTGCommanderPicker {
             this.displayCommander();
         } catch (error) {
             console.error('Error fetching commander:', error);
-            cardContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: #ff5252;">❌ Error loading commander. Please try again.</div>';
+            document.getElementById('loading-screen').innerHTML = '<div style="text-align: center; padding: 40px; color: #ff5252;">❌ Error loading commander. Please try again.</div>';
         }
     }
 
@@ -583,6 +584,12 @@ class MTGCommanderPicker {
     }
 
     displayCommander() {
+        // Hide loading, show card
+        document.getElementById('loading-screen').style.display = 'none';
+        document.getElementById('swipe-hint').style.display = 'block';
+        document.getElementById('card-container').style.display = 'block';
+        document.getElementById('swipe-buttons').style.display = 'flex';
+        
         const cardContainer = document.getElementById('card-container');
         const commander = this.currentCommander;
         
@@ -600,6 +607,9 @@ class MTGCommanderPicker {
                 </div>
             </div>
         `;
+        
+        // Re-initialize swipe after new card is displayed
+        this.initializeSwipe();
     }
 
     async fetchCardsByQuery(query, limit = 6) {
@@ -887,26 +897,6 @@ class MTGCommanderPicker {
         });
         
         deckContent.innerHTML = suggestionsHTML;
-    }
-
-    displayCommander() {
-        const cardContainer = document.getElementById('card-container');
-        const commander = this.currentCommander;
-        
-        cardContainer.innerHTML = `
-            <div class="commander-card">
-                <img id="card-image" src="${commander.imageUrl}" alt="${commander.name}" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjI4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk1URyBDYXJkPC90ZXh0Pjwvc3ZnPg=='">
-                <div class="card-info">
-                    <h2 id="card-name">${commander.name}</h2>
-                    <p id="card-type">${commander.type}</p>
-                    <p style="margin-bottom: 10px;"><strong>Mana Value:</strong> ${commander.manaValue} | <strong>Bracket:</strong> ${commander.bracket}</p>
-                    <div class="explanation" id="explanation">
-                        <strong>Why build this deck?</strong><br>
-                        ${commander.explanation}
-                    </div>
-                </div>
-            </div>
-        `;
     }
 
     rejectCommander() {
