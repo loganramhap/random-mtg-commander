@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  mtg-commander-picker:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - CORS_ORIGINS=*
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Development services (use with docker-compose -f docker-compose.yml -f docker-compose.dev.yml up)
+  dev-frontend:
+    profiles: ["dev"]
+    build:
+      context: .
+      target: frontend-builder
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npm run dev
+    environment:
+      - VITE_EDHREC_API_URL=http://localhost:8000
+
+  dev-backend:
+    profiles: ["dev"]
+    build:
+      context: .
+      target: backend
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./api:/app/api
+    command: python api/edhrec_service.py
+    environment:
+      - PORT=8000
+      - CORS_ORIGINS=http://localhost:3000

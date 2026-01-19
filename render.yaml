@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: mtg-commander-picker
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: CORS_ORIGINS
+        value: "*"
+    scaling:
+      minInstances: 1
+      maxInstances: 3

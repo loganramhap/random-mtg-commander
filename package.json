@@ -1,0 +1,22 @@
+{
+  "name": "mtg-commander-picker",
+  "version": "1.0.0",
+  "description": "A Tinder-style MTG Commander picker with filters and deck suggestions",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "node server.js",
+    "start-all": "python start_services.py",
+    "edhrec-service": "python api/edhrec_service.py"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  },
+  "type": "module"
+}

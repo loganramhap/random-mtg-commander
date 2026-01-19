@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTG Commander Picker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <header>
+            <h1>🎯 MTG Commander Picker</h1>
+            <p>Find your next commander with style!</p>
+        </header>
+
+        <div class="filters-section">
+            <div class="filter-group">
+                <label>Colors:</label>
+                <div class="color-filters">
+                    <button class="color-btn" data-color="W">⚪</button>
+                    <button class="color-btn" data-color="U">🔵</button>
+                    <button class="color-btn" data-color="B">⚫</button>
+                    <button class="color-btn" data-color="R">🔴</button>
+                    <button class="color-btn" data-color="G">🟢</button>
+                    <button class="color-btn colorless" data-color="C">◯</button>
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <label>Bracket Level:</label>
+                <select id="bracket-filter">
+                    <option value="">Any</option>
+                    <option value="1">Bracket 1</option>
+                    <option value="2">Bracket 2</option>
+                    <option value="3">Bracket 3</option>
+                    <option value="4">Bracket 4</option>
+                    <option value="5">Bracket 5 (cEDH)</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label>Mana Value: <span id="mana-range">1 - 10</span></label>
+                <div class="range-slider">
+                    <input type="range" id="mana-min" min="0" max="15" value="1">
+                    <input type="range" id="mana-max" min="0" max="15" value="10">
+                </div>
+            </div>
+
+            <button id="apply-filters" class="apply-btn">Find Commander</button>
+        </div>
+
+        <div class="card-section" id="card-section" style="display: none;">
+            <div class="card-container" id="card-container">
+                <div class="commander-card" id="commander-card">
+                    <img id="card-image" src="" alt="Commander card">
+                    <div class="card-info">
+                        <h2 id="card-name"></h2>
+                        <p id="card-type"></p>
+                        <div class="explanation" id="explanation"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="swipe-buttons">
+                <button class="swipe-btn reject" id="reject-btn">👎 Pass</button>
+                <button class="swipe-btn accept" id="accept-btn">👍 Pick This!</button>
+            </div>
+        </div>
+
+        <div class="deck-suggestions" id="deck-suggestions" style="display: none;">
+            <h2>🎉 Great Choice!</h2>
+            <div id="deck-content"></div>
+            <button id="new-search" class="apply-btn">Find Another Commander</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
