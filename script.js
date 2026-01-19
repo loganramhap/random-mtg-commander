@@ -73,13 +73,25 @@ class MTGCommanderPicker {
         this.lastScryfallRequest = Date.now();
         
         try {
-            const response = await fetch(url + (params ? '?' + new URLSearchParams(params) : ''));
+            // Build the full URL with parameters
+            const fullUrl = url + (params ? '?' + new URLSearchParams(params) : '');
+            
+            // Make request with proper headers for Scryfall CORS
+            const response = await fetch(fullUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'User-Agent': 'MTGCommanderPicker/1.0 (randomcommander.xyz)'
+                },
+                mode: 'cors'
+            });
             
             if (!response.ok) {
                 throw new Error(`Scryfall API error: ${response.status}`);
             }
             
             return await response.json();
+            
         } catch (error) {
             console.error('Scryfall request failed:', error);
             throw error;
