@@ -4,7 +4,6 @@ class MTGCommanderPicker {
         this.currentCommander = null;
         this.filters = {
             colors: [],
-            bracket: '',
             manaMin: 1,
             manaMax: 10
         };
@@ -386,7 +385,6 @@ class MTGCommanderPicker {
 
     async findCommander() {
         this.filters.colors = Array.from(this.selectedColors);
-        this.filters.bracket = document.getElementById('bracket-filter').value;
         
         // Clear queue when filters change
         this.commanderQueue = [];
@@ -445,16 +443,6 @@ class MTGCommanderPicker {
         
         // Add mana value filter
         query += ` mv>=${this.filters.manaMin} mv<=${this.filters.manaMax}`;
-        
-        // Add bracket filter (approximate mapping)
-        if (this.filters.bracket) {
-            const bracket = parseInt(this.filters.bracket);
-            if (bracket === 1) {
-                query += ' -is:reserved (rarity:common OR rarity:uncommon)';
-            } else if (bracket === 5) {
-                query += ' (is:reserved OR rarity:mythic)';
-            }
-        }
         
         console.log('Scryfall query:', query);
         
@@ -596,6 +584,24 @@ class MTGCommanderPicker {
         return shuffled;
     }
 
+    colorSymbols(colors) {
+        // Convert color letters to mana symbols
+        const symbolMap = {
+            'W': '⚪',
+            'U': '🔵',
+            'B': '⚫',
+            'R': '🔴',
+            'G': '🟢',
+            'C': '◯'
+        };
+        
+        if (!colors || colors.length === 0) {
+            return '◯'; // Colorless
+        }
+        
+        return colors.map(c => symbolMap[c] || c).join('');
+    }
+
     async processAndQueueCommander(card) {
         // Check if this commander has Partner
         const oracleText = card.oracle_text?.toLowerCase() || '';
@@ -689,23 +695,10 @@ class MTGCommanderPicker {
             combinedColors = [...new Set([...colors, ...partnerColors])].sort();
         }
         
-        // Estimate bracket level based on card characteristics
-        let bracket = 2; // Default
-        if (card.reserved || card.rarity === 'mythic') bracket = Math.max(bracket, 4);
-        if (card.edhrec_rank && card.edhrec_rank < 100) bracket = 5;
-        if (card.edhrec_rank && card.edhrec_rank > 5000) bracket = 1;
-        if (combinedColors.length >= 4) bracket = Math.max(bracket, 3);
-        
-        // If partner, adjust bracket
-        if (partnerCard && partnerCard.edhrec_rank && partnerCard.edhrec_rank < 100) {
-            bracket = Math.max(bracket, 5);
-        }
-        
         return {
             name: partnerCard ? `${card.name} & ${partnerCard.name}` : card.name,
             colors: combinedColors,
             manaValue: card.cmc || 0,
-            bracket: bracket,
             type: card.type_line,
             imageUrl: card.image_uris?.normal || card.image_uris?.large || '',
             scryfallId: card.id,
@@ -869,6 +862,8 @@ class MTGCommanderPicker {
 
     displayCommander() {
         console.log('Displaying commander:', this.currentCommander.name);
+        console.log('Commander mana value:', this.currentCommander.manaValue);
+        console.log('Commander colors:', this.currentCommander.colors);
         
         // Reset loading screen content in case it had an error message
         const loadingScreen = document.getElementById('loading-screen');
@@ -902,7 +897,7 @@ class MTGCommanderPicker {
                     <div class="card-info">
                         <h2 id="card-name">${commander.name}</h2>
                         <p id="card-type">Partner Commanders</p>
-                        <p style="margin-bottom: 10px;"><strong>Combined Colors:</strong> ${commander.colors.length} | <strong>Bracket:</strong> ${commander.bracket}</p>
+                        <p style="margin-bottom: 10px;"><strong>Colors:</strong> ${this.colorSymbols(commander.colors)}</p>
                         <div class="explanation" id="explanation">
                             <strong>Why build this deck?</strong><br>
                             ${commander.explanation}
@@ -917,7 +912,7 @@ class MTGCommanderPicker {
                     <div class="card-info">
                         <h2 id="card-name">${commander.name}</h2>
                         <p id="card-type">${commander.type}</p>
-                        <p style="margin-bottom: 10px;"><strong>Mana Value:</strong> ${commander.manaValue} | <strong>Bracket:</strong> ${commander.bracket}</p>
+                        <p style="margin-bottom: 10px;"><strong>Mana Value:</strong> ${commander.manaValue} | <strong>Colors:</strong> ${this.colorSymbols(commander.colors)}</p>
                         <div class="explanation" id="explanation">
                             <strong>Why build this deck?</strong><br>
                             ${commander.explanation}
@@ -949,7 +944,8 @@ class MTGCommanderPicker {
     }
 
     async acceptCommander() {
-        console.log('Accept commander called');
+        console.log('Accept commander called for:', this.currentCommander.name);
+        
         document.getElementById('card-section').style.display = 'none';
         document.getElementById('deck-suggestions').style.display = 'block';
         
@@ -1146,13 +1142,60 @@ class MTGCommanderPicker {
     }
 
     generateExplanation(card) {
-        const explanations = [
-            `${card.name} offers unique gameplay with ${card.oracle_text ? 'powerful abilities' : 'interesting mechanics'} that can lead to exciting deck building opportunities.`,
-            `This commander excels in ${card.color_identity.length > 1 ? 'multicolor' : 'focused'} strategies and provides great value for creative deck builders.`,
-            `${card.name} is perfect for players who enjoy ${card.color_identity.includes('U') ? 'control and card draw' : card.color_identity.includes('R') ? 'aggressive strategies' : card.color_identity.includes('G') ? 'ramp and big creatures' : card.color_identity.includes('B') ? 'graveyard synergies' : 'protection and lifegain'} themes.`
-        ];
+        // Get more specific based on card characteristics
+        const colors = card.color_identity || [];
+        const colorCount = colors.length;
+        const cmc = card.cmc || 0;
+        const oracleText = (card.oracle_text || '').toLowerCase();
         
-        return explanations[Math.floor(Math.random() * explanations.length)];
+        // Analyze card abilities for better explanations
+        let themes = [];
+        if (oracleText.includes('draw')) themes.push('card advantage');
+        if (oracleText.includes('token')) themes.push('token generation');
+        if (oracleText.includes('counter')) themes.push('counter synergies');
+        if (oracleText.includes('graveyard') || oracleText.includes('dies')) themes.push('graveyard recursion');
+        if (oracleText.includes('sacrifice')) themes.push('sacrifice strategies');
+        if (oracleText.includes('combat') || oracleText.includes('attack')) themes.push('combat-focused gameplay');
+        if (oracleText.includes('spell') || oracleText.includes('instant') || oracleText.includes('sorcery')) themes.push('spellslinger');
+        if (oracleText.includes('artifact')) themes.push('artifact synergies');
+        if (oracleText.includes('enchantment')) themes.push('enchantment strategies');
+        if (oracleText.includes('tribal') || oracleText.includes('creature type')) themes.push('tribal synergies');
+        
+        // Build explanation based on characteristics
+        let explanation = `${card.name} `;
+        
+        if (themes.length > 0) {
+            explanation += `excels at ${themes.slice(0, 2).join(' and ')}. `;
+        } else {
+            explanation += `offers unique gameplay opportunities. `;
+        }
+        
+        // Add color-based strategy
+        if (colorCount === 0) {
+            explanation += `As a colorless commander, it fits into any deck and offers universal utility.`;
+        } else if (colorCount === 1) {
+            const colorThemes = {
+                'W': 'protection, lifegain, and go-wide strategies',
+                'U': 'control, card draw, and spell manipulation',
+                'B': 'removal, graveyard recursion, and sacrifice synergies',
+                'R': 'aggressive strategies, direct damage, and artifact synergies',
+                'G': 'ramp, big creatures, and overwhelming board presence'
+            };
+            explanation += `This mono-${colors[0]} commander focuses on ${colorThemes[colors[0]] || 'focused strategies'}.`;
+        } else if (colorCount === 2) {
+            explanation += `This two-color commander provides excellent flexibility while maintaining consistent mana.`;
+        } else if (colorCount >= 3) {
+            explanation += `With access to ${colorCount} colors, this commander offers incredible versatility and powerful card options.`;
+        }
+        
+        // Add CMC consideration
+        if (cmc <= 3) {
+            explanation += ` Its low mana cost means you can cast it early and often.`;
+        } else if (cmc >= 6) {
+            explanation += ` While expensive, the powerful abilities justify the investment.`;
+        }
+        
+        return explanation;
     }
 
     displayDeckSuggestions() {
