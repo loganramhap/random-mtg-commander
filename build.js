@@ -9,7 +9,7 @@ async function buildApp() {
     
     await build({
       // Vite config options
-      base: process.env.NODE_ENV === 'production' ? '/random-mtg-commander/' : '/',
+      base: '/',  // Root path for custom domain
       build: {
         outDir: 'dist',
         assetsDir: 'assets'
