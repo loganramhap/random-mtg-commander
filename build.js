@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // Simple build script using Vite API
-const { build } = require('vite');
+import { build } from 'vite';
 
 async function buildApp() {
   try {
