@@ -26,6 +26,9 @@ After the first successful deployment:
 If you prefer manual deployment:
 
 ```bash
+# If you have an old package-lock.json, delete it first
+rm package-lock.json
+
 # Install dependencies
 npm install
 

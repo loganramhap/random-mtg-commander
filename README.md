@@ -26,6 +26,9 @@ A Tinder-style web app for discovering your next Magic: The Gathering commander!
 
 ### Development
 ```bash
+# If you have an old package-lock.json, delete it first
+rm package-lock.json
+
 # Install dependencies
 npm install
 
