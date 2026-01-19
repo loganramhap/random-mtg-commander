@@ -33,14 +33,14 @@ jobs:
         rm -f package-lock.json
         npm install
         
-    - name: Verify installation
+    - name: Fix permissions and verify
       run: |
-        ls -la node_modules/.bin/
-        which npx
-        npx vite --version
+        chmod +x node_modules/.bin/*
+        ls -la node_modules/.bin/vite
+        node node_modules/.bin/vite --version
         
     - name: Build
-      run: npm run build
+      run: node node_modules/.bin/vite build
       
     - name: Setup Pages
       uses: actions/configure-pages@v4
