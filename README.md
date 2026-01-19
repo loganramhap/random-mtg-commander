@@ -1,149 +1,207 @@
 # MTG Commander Picker 🎯
 
-A Tinder-style web app for discovering your next Magic: The Gathering commander! Uses real data from Scryfall API and EDHREC via the `pyedhrec` Python wrapper for authentic commander suggestions and popular deck building recommendations.
+A Tinder-style web app for discovering your next Magic: The Gathering commander! Uses Scryfall API for commander data and scrapes EDHREC for popular deck building recommendations. Pure JavaScript - no backend required!
 
 ## Features
 
 - **Real MTG Data**: Powered by Scryfall API for accurate commander information
-- **EDHREC Integration**: Uses `pyedhrec` Python wrapper for reliable EDHREC data access
+- **EDHREC Integration**: Scrapes EDHREC data for popular card suggestions
 - **Smart Filters**: Choose colors, bracket levels (1-5 including cEDH), and mana value ranges
 - **Tinder-Style Interface**: Swipe left to pass, right to pick your commander
 - **Detailed Card Info**: High-quality card images and oracle text
 - **Popular Card Suggestions**: Real EDHREC data organized by deck categories
 - **Mobile Responsive**: Works great on desktop and mobile devices
+- **Pure Frontend**: No backend required - deploys anywhere static sites work
 
 ## Architecture
 
-### Frontend (JavaScript)
-- Vanilla JavaScript with modern ES6+ features
-- Fetches commanders from Scryfall API
-- Communicates with Python backend for EDHREC data
-
-### Backend (Python)
-- FastAPI service using `pyedhrec` wrapper
-- Handles EDHREC data fetching and processing
-- Provides clean REST API for frontend consumption
-- CORS enabled for local development
+### Single-Page Application
+- **Vanilla JavaScript** with modern ES6+ features
+- **Direct API Integration** with Scryfall for commander data
+- **Client-side EDHREC scraping** using CORS proxy
+- **Built-in caching** for better performance
+- **Rate limiting** to respect Scryfall's API guidelines
 
 ## Quick Start
 
-### Option 1: Automatic Setup (Recommended)
+### Development
 ```bash
-# Install Node.js dependencies
+# Install dependencies
 npm install
 
-# Install Python dependencies
-pip install -r requirements.txt
-
-# Start both services automatically
-npm run start-all
-```
-
-### Option 2: Manual Setup
-```bash
-# Terminal 1: Start Python EDHREC service
-pip install -r requirements.txt
-python api/edhrec_service.py
-
-# Terminal 2: Start frontend
-npm install
+# Start development server
 npm run dev
+
+# Open http://localhost:3000
 ```
 
-## API Endpoints
+### Production Build
+```bash
+# Build for production
+npm run build
 
-### Python EDHREC Service (Port 8000)
-- `GET /` - Service health check
-- `GET /commander/{name}` - Get commander data from EDHREC
-- `GET /commander/{name}/recommendations` - Get card recommendations
-- `GET /search/commanders` - Search commanders with filters
+# Preview production build
+npm run preview
 
-### Frontend (Port 3000)
-- Main web application interface
+# Or serve with any static server
+npx serve dist
+```
 
-## Dependencies
+## API Integration
 
-### Python Requirements
-- `fastapi` - Modern web framework
-- `pyedhrec` - Official EDHREC Python wrapper
-- `uvicorn` - ASGI server
-- `requests` - HTTP client for Scryfall API
+### Scryfall API
+- **Rate Limited**: 75ms delay between requests (within 50-100ms requirement)
+- **Smart Caching**: 10-minute client-side cache for repeated requests
+- **Fallback Logic**: Graceful handling of API failures
+- **Advanced Filtering**: Color identity, mana value, bracket estimation
 
-### Node.js Requirements
-- `vite` - Build tool and dev server
-- `express` - Web server for production
+### EDHREC Scraping
+- **CORS Proxy**: Uses allorigins.win to bypass CORS restrictions
+- **HTML Parsing**: Extracts card recommendations from EDHREC pages
+- **Fallback System**: Uses Scryfall data if EDHREC scraping fails
+- **Smart Categorization**: Organizes cards by type and synergy
+
+## GitHub Pages Deployment
+
+This app is designed specifically for GitHub Pages deployment!
+
+### Automatic Deployment (Recommended)
+1. **Enable GitHub Pages**:
+   - Go to repository Settings → Pages
+   - Set Source to "GitHub Actions"
+   
+2. **Push to main branch** - the app auto-deploys via GitHub Actions
+
+3. **Access your app** at: `https://yourusername.github.io/random-mtg-commander/`
+
+### Manual Deployment
+```bash
+npm install
+npm run deploy  # Uses gh-pages package
+```
+
+### Custom Domain (Optional)
+1. Edit the `CNAME` file with your domain
+2. Configure DNS to point to GitHub Pages
+3. Update `vite.config.js` base path to `/`
+
+See `GITHUB_PAGES_SETUP.md` for detailed instructions.
 
 ## Development
 
-### Adding New Features
-1. **Commander Filters**: Modify Scryfall queries in `fetchRandomCommander()`
-2. **EDHREC Categories**: Update `process_recommendations()` in Python service
-3. **UI Components**: Edit HTML/CSS/JS files directly
-
-### API Integration
-- Scryfall API: Direct frontend calls (no rate limiting needed)
-- EDHREC API: Through Python service using `pyedhrec` wrapper
-
-## Deployment
-
-### Development
+### Local Development
 ```bash
-npm run start-all  # Starts both services
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+# Open http://localhost:3000
 ```
 
-### Production Options
-
-#### Option 1: Separate Services
-Deploy Python service and Node.js frontend separately:
-- Python service: Railway, Render, or Heroku
-- Frontend: Vercel, Netlify, or static hosting
-
-#### Option 2: Docker
-```dockerfile
-# Multi-stage build with both Python and Node.js
-# (Docker configuration can be added if needed)
-```
-
-#### Option 3: Serverless
-- Convert Python service to serverless functions
-- Deploy frontend as static site
-
-## Configuration
-
-### Environment Variables
+### Production Build
 ```bash
-# Python service
-EDHREC_API_PORT=8000
-CORS_ORIGINS=http://localhost:3000
+# Build for production
+npm run build
 
-# Frontend
-VITE_EDHREC_API_URL=http://localhost:8000
+# Preview production build locally
+npm run preview
 ```
+
+## Performance Features
+
+### Caching System
+- **Client-side cache**: 10-minute TTL for API responses
+- **Smart cache keys**: Based on filter combinations
+- **Automatic cleanup**: Prevents memory leaks
+- **Cache statistics**: Monitor performance in browser console
+
+### Rate Limiting
+- **Scryfall compliance**: 75ms delay between requests
+- **Request queuing**: Prevents API limit violations
+- **Graceful degradation**: Continues working if rate limited
+
+### Optimization
+- **Lazy loading**: Images load as needed
+- **Efficient parsing**: Minimal DOM manipulation
+- **Compressed assets**: Vite optimizes bundle size
+- **CDN ready**: All assets can be served from CDN
+
+## Browser Support
+
+- **Modern browsers**: Chrome 80+, Firefox 75+, Safari 13+, Edge 80+
+- **Mobile browsers**: iOS Safari 13+, Chrome Mobile 80+
+- **Required features**: ES6 modules, Fetch API, DOM Parser
+
+## Development
+
+### Project Structure
+```
+├── .github/workflows/   # GitHub Actions deployment
+├── index.html          # Main HTML file
+├── script.js           # Main application logic
+├── style.css           # Styles and responsive design
+├── vite.config.js      # Vite configuration
+├── CNAME               # Custom domain (optional)
+└── dist/               # Built files (generated)
+```
+
+### Adding Features
+1. **New Filters**: Modify `fetchRandomCommander()` Scryfall queries
+2. **EDHREC Parsing**: Update `parseEDHRECHTML()` for new layouts
+3. **UI Components**: Edit HTML/CSS directly
+4. **Caching**: Adjust cache TTL in constructor
+
+### API Rate Limits
+- **Scryfall**: ~13 requests/second (within 10 req/sec average guideline)
+- **EDHREC**: Respectful scraping with delays between requests
+- **CORS Proxy**: allorigins.win has generous limits for hobby projects
 
 ## Troubleshooting
 
 ### Common Issues
-1. **CORS Errors**: Ensure Python service is running on port 8000
-2. **pyedhrec Import Error**: Run `pip install -r requirements.txt`
-3. **Node Modules Missing**: Run `npm install`
-4. **Port Conflicts**: Change ports in configuration files
 
-### Service Status
-- Python service: http://localhost:8000 (should show service info)
-- Frontend: http://localhost:3000 (main application)
+1. **CORS Errors**
+   - The app uses allorigins.win proxy for EDHREC
+   - If proxy fails, it falls back to Scryfall recommendations
+
+2. **Slow Loading**
+   - Check browser network tab for failed requests
+   - Clear browser cache if needed
+   - EDHREC scraping can be slow on first load
+
+3. **No Commanders Found**
+   - Try broader filter settings
+   - Check browser console for API errors
+   - Scryfall API might be temporarily unavailable
+
+4. **Missing Card Images**
+   - Images load from Scryfall CDN
+   - Fallback placeholder shows if image fails
+   - Check network connectivity
+
+### Performance Tips
+- Use browser dev tools to monitor network requests
+- Check console for cache hit/miss statistics
+- Monitor memory usage for long sessions
 
 ## Contributing
 
 Feel free to:
-- Add more sophisticated EDHREC data processing
-- Improve commander filtering and search
-- Add caching for better performance
-- Enhance the UI/UX
-- Add more deployment options
+- Improve EDHREC scraping reliability
+- Add more sophisticated filtering options
+- Enhance mobile responsiveness
+- Add new deployment configurations
+- Optimize bundle size and performance
 
 ## Tech Stack
 
-- **Frontend**: Vanilla JavaScript, CSS3, Vite
-- **Backend**: Python, FastAPI, pyedhrec
-- **APIs**: Scryfall (direct), EDHREC (via pyedhrec)
-- **Deployment**: Node.js + Python services
+- **Frontend**: Vanilla JavaScript, CSS3, HTML5
+- **Build Tool**: Vite for development and building
+- **APIs**: Scryfall (direct), EDHREC (scraped via CORS proxy)
+- **Deployment**: GitHub Pages with GitHub Actions
+- **Hosting**: Static files served from GitHub's CDN
+
+## License
+
+MIT License - feel free to use this project as a starting point for your own MTG tools!

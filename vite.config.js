@@ -8,5 +8,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     assetsDir: 'assets'
-  }
+  },
+  // GitHub Pages configuration
+  base: process.env.NODE_ENV === 'production' ? '/random-mtg-commander/' : '/'
 });

@@ -11,9 +11,6 @@ class MTGCommanderPicker {
         
         // API endpoints
         this.scryfallAPI = 'https://api.scryfall.com';
-        this.edhrecAPI = process.env.NODE_ENV === 'production' 
-            ? '/api'  // Use relative path in production
-            : 'http://localhost:8000'; // Python EDHREC service for development
         
         // Rate limiting for Scryfall (50-100ms between requests)
         this.lastScryfallRequest = 0;
@@ -456,27 +453,134 @@ class MTGCommanderPicker {
         }
 
         try {
-            // Use Python EDHREC service for recommendations
-            const edhrecUrl = `${this.edhrecAPI}/commander/${encodeURIComponent(this.currentCommander.name)}/recommendations`;
+            // Try to get EDHREC data by scraping
+            const suggestions = await this.scrapeEDHRECData(this.currentCommander.name);
             
-            const response = await fetch(edhrecUrl);
-            
-            if (response.ok) {
-                const data = await response.json();
-                
-                if (data.status === 'success' && data.recommendations) {
-                    this.currentCommander.deckSuggestions = data.recommendations;
-                } else {
-                    throw new Error('No EDHREC data available');
-                }
+            if (suggestions && Object.keys(suggestions).length > 0) {
+                this.currentCommander.deckSuggestions = suggestions;
             } else {
-                throw new Error('EDHREC service unavailable');
+                throw new Error('No EDHREC data available');
             }
         } catch (error) {
-            console.log('EDHREC service failed, using Scryfall recommendations:', error);
+            console.log('EDHREC scraping failed, using Scryfall recommendations:', error);
             // Fallback to Scryfall-based suggestions
             this.currentCommander.deckSuggestions = await this.generateScryfallSuggestions();
         }
+    }
+
+    async scrapeEDHRECData(commanderName) {
+        // Normalize commander name for EDHREC URL
+        const normalizedName = commanderName.toLowerCase()
+            .replace(/[^a-z0-9\s]/g, '')
+            .replace(/\s+/g, '-');
+        
+        const edhrecUrl = `https://edhrec.com/commanders/${normalizedName}`;
+        
+        try {
+            // Use a CORS proxy to fetch EDHREC data
+            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(edhrecUrl)}`;
+            const response = await fetch(proxyUrl);
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch EDHREC data');
+            }
+            
+            const data = await response.json();
+            const htmlContent = data.contents;
+            
+            // Parse the HTML to extract card recommendations
+            return this.parseEDHRECHTML(htmlContent);
+            
+        } catch (error) {
+            console.error('EDHREC scraping error:', error);
+            return null;
+        }
+    }
+
+    parseEDHRECHTML(html) {
+        // Create a temporary DOM element to parse HTML
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        
+        const suggestions = {};
+        
+        try {
+            // Look for card recommendation sections
+            const cardSections = doc.querySelectorAll('.cardview-container, .card-grid, .cardlist');
+            
+            cardSections.forEach((section, index) => {
+                const cards = [];
+                
+                // Extract card names from various possible selectors
+                const cardElements = section.querySelectorAll(
+                    '.card-name, .cardview-name, [data-card-name], .card-title, a[href*="/cards/"]'
+                );
+                
+                cardElements.forEach(element => {
+                    let cardName = element.textContent?.trim() || 
+                                  element.getAttribute('data-card-name') || 
+                                  element.getAttribute('title');
+                    
+                    if (cardName && cardName.length > 2 && !cards.includes(cardName)) {
+                        cards.push(cardName);
+                    }
+                });
+                
+                if (cards.length > 0) {
+                    // Try to determine category from section headers
+                    const header = section.querySelector('h2, h3, .section-title, .cardlist-title');
+                    const categoryName = header?.textContent?.trim() || `Category ${index + 1}`;
+                    
+                    suggestions[categoryName] = cards.slice(0, 8); // Limit to 8 cards per category
+                }
+            });
+            
+            // If no structured data found, try alternative parsing
+            if (Object.keys(suggestions).length === 0) {
+                return this.parseEDHRECAlternative(doc);
+            }
+            
+            return suggestions;
+            
+        } catch (error) {
+            console.error('Error parsing EDHREC HTML:', error);
+            return {};
+        }
+    }
+
+    parseEDHRECAlternative(doc) {
+        // Alternative parsing method for different EDHREC layouts
+        const suggestions = {
+            "Popular Cards": [],
+            "Creatures": [],
+            "Instants & Sorceries": [],
+            "Artifacts & Enchantments": []
+        };
+        
+        // Look for any links that might be card names
+        const cardLinks = doc.querySelectorAll('a[href*="/cards/"], a[href*="scryfall.com"]');
+        
+        cardLinks.forEach(link => {
+            const cardName = link.textContent?.trim();
+            if (cardName && cardName.length > 2) {
+                // Categorize based on context or just add to popular
+                suggestions["Popular Cards"].push(cardName);
+            }
+        });
+        
+        // Remove duplicates and limit
+        Object.keys(suggestions).forEach(category => {
+            suggestions[category] = [...new Set(suggestions[category])].slice(0, 8);
+        });
+        
+        // Remove empty categories
+        Object.keys(suggestions).forEach(category => {
+            if (suggestions[category].length === 0) {
+                delete suggestions[category];
+            }
+        });
+        
+        return suggestions;
     }
 
     async generateScryfallSuggestions() {
@@ -620,12 +724,7 @@ class MTGCommanderPicker {
         // Find a new commander with same filters
         this.findCommander();
     }
-}
 
-// Initialize the app when the page loads
-document.addEventListener('DOMContentLoaded', () => {
-    new MTGCommanderPicker();
-});
     resetToFilters() {
         document.getElementById('card-section').style.display = 'none';
         document.getElementById('deck-suggestions').style.display = 'none';
@@ -638,4 +737,5 @@ document.addEventListener('DOMContentLoaded', () => {
 // Initialize the app when the page loads
 document.addEventListener('DOMContentLoaded', () => {
     new MTGCommanderPicker();
+});
 });
