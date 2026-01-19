@@ -86,12 +86,18 @@ class MTGCommanderPicker {
             startX = e.clientX;
             startY = e.clientY;
             newCardContainer.style.cursor = 'grabbing';
+            
+            // Prevent body scroll during drag
+            document.body.style.overflow = 'hidden';
+            
             console.log('Mouse down - drag started');
             e.preventDefault();
         });
 
         document.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
+            
+            e.preventDefault(); // Prevent any default behavior during drag
             
             currentX = e.clientX - startX;
             currentY = e.clientY - startY;
@@ -121,6 +127,9 @@ class MTGCommanderPicker {
             console.log('Mouse up - checking swipe distance:', currentX);
             isDragging = false;
             newCardContainer.style.cursor = 'grab';
+            
+            // Re-enable body scroll
+            document.body.style.overflow = '';
             
             const card = newCardContainer.querySelector('.commander-card');
             if (card) {
@@ -163,6 +172,10 @@ class MTGCommanderPicker {
             isDragging = true;
             startX = e.touches[0].clientX;
             startY = e.touches[0].clientY;
+            
+            // Prevent body scroll during drag
+            document.body.style.overflow = 'hidden';
+            
             console.log('Touch start - drag started');
             e.preventDefault();
         }, { passive: false });
@@ -197,6 +210,9 @@ class MTGCommanderPicker {
             console.log('Touch end - checking swipe distance:', currentX);
             isDragging = false;
             
+            // Re-enable body scroll
+            document.body.style.overflow = '';
+            
             const card = newCardContainer.querySelector('.commander-card');
             if (card) {
                 if (Math.abs(currentX) > 100) {
@@ -222,6 +238,14 @@ class MTGCommanderPicker {
             
             currentX = 0;
             currentY = 0;
+        });
+        
+        // Also handle touchcancel to re-enable scroll
+        newCardContainer.addEventListener('touchcancel', () => {
+            if (isDragging) {
+                isDragging = false;
+                document.body.style.overflow = '';
+            }
         });
     }
 
@@ -453,10 +477,12 @@ class MTGCommanderPicker {
                 const fallbackData = await this.rateLimitedScryfallRequest(`${this.scryfallAPI}/cards/search`, fallbackParams);
                 
                 if (fallbackData.data && fallbackData.data.length > 0) {
-                    // Process up to queueSize commanders
-                    const commandersToAdd = fallbackData.data.slice(0, this.queueSize);
+                    // Shuffle the results to avoid alphabetical ordering
+                    const shuffled = this.shuffleArray(fallbackData.data);
+                    const commandersToAdd = shuffled.slice(0, this.queueSize);
+                    
                     for (const card of commandersToAdd) {
-                        this.commanderQueue.push(this.processCommanderCard(card));
+                        await this.processAndQueueCommander(card);
                     }
                     console.log('Prefetched', commandersToAdd.length, 'commanders (fallback)');
                     return;
@@ -465,10 +491,12 @@ class MTGCommanderPicker {
                 throw new Error('No commanders found');
             }
             
-            // Process up to queueSize commanders from results
-            const commandersToAdd = data.data.slice(0, this.queueSize);
+            // Shuffle the results to avoid alphabetical ordering
+            const shuffled = this.shuffleArray(data.data);
+            const commandersToAdd = shuffled.slice(0, this.queueSize);
+            
             for (const card of commandersToAdd) {
-                this.commanderQueue.push(this.processCommanderCard(card));
+                await this.processAndQueueCommander(card);
             }
             
             console.log('Prefetched', commandersToAdd.length, 'commanders. Queue size:', this.commanderQueue.length);
@@ -558,29 +586,144 @@ class MTGCommanderPicker {
         return this.processCommanderCard(randomCard);
     }
 
-    processCommanderCard(card) {
+    shuffleArray(array) {
+        // Fisher-Yates shuffle algorithm
+        const shuffled = [...array];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
+    }
+
+    async processAndQueueCommander(card) {
+        // Check if this commander has Partner
+        const oracleText = card.oracle_text?.toLowerCase() || '';
+        const hasPartner = card.keywords?.includes('Partner') || oracleText.includes('partner');
+        
+        if (hasPartner) {
+            // Check for "Partner with [Name]"
+            const partnerWithMatch = card.oracle_text?.match(/Partner with ([^(\n]+)/i);
+            
+            if (partnerWithMatch) {
+                // This has a specific partner
+                const partnerName = partnerWithMatch[1].trim();
+                console.log(`${card.name} has Partner with ${partnerName}, fetching specific partner...`);
+                
+                try {
+                    const partnerCard = await this.fetchSpecificPartner(partnerName);
+                    if (partnerCard) {
+                        const pairedCommander = this.processCommanderCard(card, partnerCard);
+                        this.commanderQueue.push(pairedCommander);
+                        return;
+                    }
+                } catch (error) {
+                    console.log('Failed to fetch specific partner, using solo:', error);
+                }
+            } else if (!oracleText.includes('partner with')) {
+                // This is a generic partner commander - fetch a random partner to pair with it
+                console.log(`${card.name} has Partner, fetching a random partner...`);
+                
+                try {
+                    const partnerCard = await this.fetchPartnerCommander(card);
+                    if (partnerCard) {
+                        const pairedCommander = this.processCommanderCard(card, partnerCard);
+                        this.commanderQueue.push(pairedCommander);
+                        return;
+                    }
+                } catch (error) {
+                    console.log('Failed to fetch partner, using solo:', error);
+                }
+            }
+        }
+        
+        // Regular commander or failed to get partner
+        this.commanderQueue.push(this.processCommanderCard(card));
+    }
+
+    async fetchSpecificPartner(partnerName) {
+        // Fetch the specific partner by name
+        try {
+            const data = await this.rateLimitedScryfallRequest(
+                `${this.scryfallAPI}/cards/named`,
+                { fuzzy: partnerName }
+            );
+            
+            return data || null;
+        } catch (error) {
+            console.error('Error fetching specific partner:', error);
+            return null;
+        }
+    }
+
+    async fetchPartnerCommander(mainCard) {
+        // Fetch a random commander with Partner that isn't the same as mainCard
+        const partnerQuery = 'is:commander (o:"partner" OR keyword:partner) -o:"partner with"';
+        
+        try {
+            const data = await this.rateLimitedScryfallRequest(
+                `${this.scryfallAPI}/cards/search`,
+                { q: partnerQuery, order: 'random' }
+            );
+            
+            if (data.data && data.data.length > 0) {
+                // Find a partner that isn't the same card
+                const partner = data.data.find(card => card.id !== mainCard.id);
+                return partner || null;
+            }
+        } catch (error) {
+            console.error('Error fetching partner:', error);
+        }
+        
+        return null;
+    }
+
+    processCommanderCard(card, partnerCard = null) {
         // Extract colors from color identity
-        const colors = card.color_identity || [];
+        let colors = card.color_identity || [];
+        let combinedColors = [...colors];
+        
+        // If there's a partner, combine color identities
+        if (partnerCard) {
+            const partnerColors = partnerCard.color_identity || [];
+            combinedColors = [...new Set([...colors, ...partnerColors])].sort();
+        }
         
         // Estimate bracket level based on card characteristics
         let bracket = 2; // Default
         if (card.reserved || card.rarity === 'mythic') bracket = Math.max(bracket, 4);
         if (card.edhrec_rank && card.edhrec_rank < 100) bracket = 5;
         if (card.edhrec_rank && card.edhrec_rank > 5000) bracket = 1;
-        if (colors.length >= 4) bracket = Math.max(bracket, 3);
+        if (combinedColors.length >= 4) bracket = Math.max(bracket, 3);
+        
+        // If partner, adjust bracket
+        if (partnerCard && partnerCard.edhrec_rank && partnerCard.edhrec_rank < 100) {
+            bracket = Math.max(bracket, 5);
+        }
         
         return {
-            name: card.name,
-            colors: colors,
+            name: partnerCard ? `${card.name} & ${partnerCard.name}` : card.name,
+            colors: combinedColors,
             manaValue: card.cmc || 0,
             bracket: bracket,
             type: card.type_line,
             imageUrl: card.image_uris?.normal || card.image_uris?.large || '',
             scryfallId: card.id,
             oracleText: card.oracle_text || '',
-            explanation: this.generateExplanation(card),
-            deckSuggestions: null // Will be fetched from EDHREC
+            explanation: partnerCard ? this.generatePartnerExplanation(card, partnerCard) : this.generateExplanation(card),
+            deckSuggestions: null, // Will be fetched from EDHREC
+            partner: partnerCard ? {
+                name: partnerCard.name,
+                imageUrl: partnerCard.image_uris?.normal || partnerCard.image_uris?.large || '',
+                type: partnerCard.type_line,
+                oracleText: partnerCard.oracle_text || ''
+            } : null
         };
+    }
+
+    generatePartnerExplanation(card1, card2) {
+        const colors = [...new Set([...(card1.color_identity || []), ...(card2.color_identity || [])])];
+        return `This partner pairing gives you access to ${colors.length} colors and combines ${card1.name}'s abilities with ${card2.name}'s strengths. Partner commanders offer incredible flexibility and synergy potential!`;
     }
 
     generateRandomCommander() {
@@ -748,20 +891,41 @@ class MTGCommanderPicker {
         cardContainer.style.transform = '';
         cardContainer.style.transition = '';
         
-        cardContainer.innerHTML = `
-            <div class="commander-card">
-                <img id="card-image" src="${commander.imageUrl}" alt="${commander.name}" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjI4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk1URyBDYXJkPC90ZXh0Pjwvc3ZnPg=='">
-                <div class="card-info">
-                    <h2 id="card-name">${commander.name}</h2>
-                    <p id="card-type">${commander.type}</p>
-                    <p style="margin-bottom: 10px;"><strong>Mana Value:</strong> ${commander.manaValue} | <strong>Bracket:</strong> ${commander.bracket}</p>
-                    <div class="explanation" id="explanation">
-                        <strong>Why build this deck?</strong><br>
-                        ${commander.explanation}
+        // Check if this is a partner pairing
+        if (commander.partner) {
+            cardContainer.innerHTML = `
+                <div class="commander-card partner-card">
+                    <div class="partner-images">
+                        <img class="partner-img" src="${commander.imageUrl}" alt="${commander.name.split(' & ')[0]}" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjI4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk1URyBDYXJkPC90ZXh0Pjwvc3ZnPg=='">
+                        <img class="partner-img" src="${commander.partner.imageUrl}" alt="${commander.partner.name}" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjI4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk1URyBDYXJkPC90ZXh0Pjwvc3ZnPg=='">
+                    </div>
+                    <div class="card-info">
+                        <h2 id="card-name">${commander.name}</h2>
+                        <p id="card-type">Partner Commanders</p>
+                        <p style="margin-bottom: 10px;"><strong>Combined Colors:</strong> ${commander.colors.length} | <strong>Bracket:</strong> ${commander.bracket}</p>
+                        <div class="explanation" id="explanation">
+                            <strong>Why build this deck?</strong><br>
+                            ${commander.explanation}
+                        </div>
                     </div>
                 </div>
-            </div>
-        `;
+            `;
+        } else {
+            cardContainer.innerHTML = `
+                <div class="commander-card">
+                    <img id="card-image" src="${commander.imageUrl}" alt="${commander.name}" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjI4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk1URyBDYXJkPC90ZXh0Pjwvc3ZnPg=='">
+                    <div class="card-info">
+                        <h2 id="card-name">${commander.name}</h2>
+                        <p id="card-type">${commander.type}</p>
+                        <p style="margin-bottom: 10px;"><strong>Mana Value:</strong> ${commander.manaValue} | <strong>Bracket:</strong> ${commander.bracket}</p>
+                        <div class="explanation" id="explanation">
+                            <strong>Why build this deck?</strong><br>
+                            ${commander.explanation}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
         
         // Re-initialize swipe after new card is displayed
         console.log('Re-initializing swipe for new card');
