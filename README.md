@@ -45,9 +45,6 @@ npm run build
 
 # Preview production build
 npm run preview
-
-# Or serve with any static server
-npx serve dist
 ```
 
 ## API Integration
