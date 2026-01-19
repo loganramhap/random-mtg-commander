@@ -4,10 +4,10 @@
   "description": "A Tinder-style MTG Commander picker with filters and deck suggestions",
   "main": "index.js",
   "scripts": {
-    "dev": "node node_modules/.bin/vite",
-    "build": "node node_modules/.bin/vite build",
-    "preview": "node node_modules/.bin/vite preview",
-    "deploy": "npm run build && node node_modules/.bin/gh-pages -d dist",
+    "dev": "./node_modules/.bin/vite",
+    "build": "node build.js",
+    "preview": "./node_modules/.bin/vite preview",
+    "deploy": "npm run build && ./node_modules/.bin/gh-pages -d dist",
     "postinstall": "chmod +x node_modules/.bin/* || true"
   },
   "dependencies": {},
