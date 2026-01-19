@@ -27,10 +27,13 @@ A Tinder-style web app for discovering your next Magic: The Gathering commander!
 ### Development
 ```bash
 # If you have an old package-lock.json, delete it first
-rm package-lock.json
+rm -rf package-lock.json node_modules
 
 # Install dependencies
 npm install
+
+# If you get Rollup errors, install the platform-specific dependency
+npm install @rollup/rollup-linux-x64-gnu --save-optional
 
 # Start development server
 npm run dev

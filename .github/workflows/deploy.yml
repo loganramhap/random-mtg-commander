@@ -28,10 +28,12 @@ jobs:
       with:
         node-version: '18'
         
-    - name: Clean install
+    - name: Clean install with Rollup fix
       run: |
-        rm -f package-lock.json
+        rm -rf package-lock.json node_modules
         npm install
+        # Fix for Rollup optional dependencies issue
+        npm install @rollup/rollup-linux-x64-gnu --save-optional
         
     - name: Build
       run: npm run build
