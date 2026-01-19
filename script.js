@@ -55,20 +55,34 @@ class MTGCommanderPicker {
 
     initializeSwipe() {
         const cardContainer = document.getElementById('card-container');
+        if (!cardContainer) {
+            console.log('Card container not found');
+            return;
+        }
+
+        // Remove old listeners by cloning the element
+        const newCardContainer = cardContainer.cloneNode(true);
+        cardContainer.parentNode.replaceChild(newCardContainer, cardContainer);
+        
         let startX = 0;
         let startY = 0;
         let currentX = 0;
         let currentY = 0;
         let isDragging = false;
 
+        console.log('Swipe initialized for card container');
+
         // Mouse events
-        cardContainer.addEventListener('mousedown', (e) => {
-            if (e.target.closest('.commander-card')) {
-                isDragging = true;
-                startX = e.clientX;
-                startY = e.clientY;
-                cardContainer.style.cursor = 'grabbing';
-            }
+        newCardContainer.addEventListener('mousedown', (e) => {
+            const card = newCardContainer.querySelector('.commander-card');
+            if (!card) return;
+            
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            newCardContainer.style.cursor = 'grabbing';
+            console.log('Mouse down - drag started');
+            e.preventDefault();
         });
 
         document.addEventListener('mousemove', (e) => {
@@ -77,18 +91,20 @@ class MTGCommanderPicker {
             currentX = e.clientX - startX;
             currentY = e.clientY - startY;
             
-            const card = cardContainer.querySelector('.commander-card');
+            const card = newCardContainer.querySelector('.commander-card');
             if (card) {
-                const rotation = currentX / 20; // Subtle rotation effect
+                const rotation = currentX / 20;
                 card.style.transform = `translate(${currentX}px, ${currentY}px) rotate(${rotation}deg)`;
                 card.style.transition = 'none';
                 
                 // Visual feedback
                 if (Math.abs(currentX) > 50) {
                     if (currentX > 0) {
-                        card.style.borderColor = '#4caf50'; // Green for accept
+                        card.style.borderColor = '#4caf50';
+                        console.log('Swiping right (accept)');
                     } else {
-                        card.style.borderColor = '#ff5252'; // Red for reject
+                        card.style.borderColor = '#ff5252';
+                        console.log('Swiping left (reject)');
                     }
                 }
             }
@@ -97,13 +113,15 @@ class MTGCommanderPicker {
         document.addEventListener('mouseup', () => {
             if (!isDragging) return;
             
+            console.log('Mouse up - checking swipe distance:', currentX);
             isDragging = false;
-            cardContainer.style.cursor = 'grab';
+            newCardContainer.style.cursor = 'grab';
             
-            const card = cardContainer.querySelector('.commander-card');
+            const card = newCardContainer.querySelector('.commander-card');
             if (card) {
                 // Check if swipe was significant enough
                 if (Math.abs(currentX) > 100) {
+                    console.log('Swipe threshold met! Direction:', currentX > 0 ? 'right' : 'left');
                     // Animate card flying off screen
                     const direction = currentX > 0 ? 1 : -1;
                     card.style.transition = 'transform 0.3s ease-out, opacity 0.3s ease-out';
@@ -112,12 +130,15 @@ class MTGCommanderPicker {
                     
                     setTimeout(() => {
                         if (currentX > 0) {
+                            console.log('Accepting commander');
                             this.acceptCommander();
                         } else {
+                            console.log('Rejecting commander');
                             this.rejectCommander();
                         }
                     }, 300);
                 } else {
+                    console.log('Swipe too short, snapping back');
                     // Snap back to center
                     card.style.transition = 'transform 0.3s ease-out, border-color 0.3s ease-out';
                     card.style.transform = 'translate(0, 0) rotate(0deg)';
@@ -130,22 +151,25 @@ class MTGCommanderPicker {
         });
 
         // Touch events
-        cardContainer.addEventListener('touchstart', (e) => {
-            if (e.target.closest('.commander-card')) {
-                isDragging = true;
-                startX = e.touches[0].clientX;
-                startY = e.touches[0].clientY;
-            }
-        });
+        newCardContainer.addEventListener('touchstart', (e) => {
+            const card = newCardContainer.querySelector('.commander-card');
+            if (!card) return;
+            
+            isDragging = true;
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+            console.log('Touch start - drag started');
+            e.preventDefault();
+        }, { passive: false });
 
-        cardContainer.addEventListener('touchmove', (e) => {
+        newCardContainer.addEventListener('touchmove', (e) => {
             if (!isDragging) return;
             
             e.preventDefault();
             currentX = e.touches[0].clientX - startX;
             currentY = e.touches[0].clientY - startY;
             
-            const card = cardContainer.querySelector('.commander-card');
+            const card = newCardContainer.querySelector('.commander-card');
             if (card) {
                 const rotation = currentX / 20;
                 card.style.transform = `translate(${currentX}px, ${currentY}px) rotate(${rotation}deg)`;
@@ -160,16 +184,18 @@ class MTGCommanderPicker {
                     }
                 }
             }
-        });
+        }, { passive: false });
 
-        cardContainer.addEventListener('touchend', () => {
+        newCardContainer.addEventListener('touchend', () => {
             if (!isDragging) return;
             
+            console.log('Touch end - checking swipe distance:', currentX);
             isDragging = false;
             
-            const card = cardContainer.querySelector('.commander-card');
+            const card = newCardContainer.querySelector('.commander-card');
             if (card) {
                 if (Math.abs(currentX) > 100) {
+                    console.log('Touch swipe threshold met!');
                     const direction = currentX > 0 ? 1 : -1;
                     card.style.transition = 'transform 0.3s ease-out, opacity 0.3s ease-out';
                     card.style.transform = `translate(${direction * 1000}px, ${currentY}px) rotate(${direction * 30}deg)`;
@@ -629,6 +655,7 @@ class MTGCommanderPicker {
     }
 
     async acceptCommander() {
+        console.log('Accept commander called');
         document.getElementById('card-section').style.display = 'none';
         document.getElementById('deck-suggestions').style.display = 'block';
         
@@ -900,8 +927,26 @@ class MTGCommanderPicker {
     }
 
     rejectCommander() {
-        // Find a new commander with same filters
-        this.findCommander();
+        console.log('Reject commander called');
+        // Smoothly transition to next commander without jarring reload
+        const cardContainer = document.getElementById('card-container');
+        cardContainer.style.opacity = '0';
+        cardContainer.style.transition = 'opacity 0.2s ease-out';
+        
+        setTimeout(async () => {
+            // Find a new commander with same filters
+            try {
+                this.currentCommander = await this.fetchRandomCommander();
+                this.displayCommander();
+                // Fade back in
+                setTimeout(() => {
+                    cardContainer.style.opacity = '1';
+                }, 50);
+            } catch (error) {
+                console.error('Error fetching new commander:', error);
+                cardContainer.style.opacity = '1';
+            }
+        }, 200);
     }
 
     resetToFilters() {
