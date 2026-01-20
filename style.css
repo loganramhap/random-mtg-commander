@@ -59,25 +59,35 @@ header h1 {
 .color-btn {
     width: 50px;
     height: 50px;
-    border: 3px solid #ddd;
+    border: 3px solid transparent;
     border-radius: 50%;
-    background: white;
-    font-size: 1.5rem;
+    background: transparent;
+    font-size: 2rem;
     cursor: pointer;
     transition: all 0.3s ease;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.color-btn i {
+    font-size: 2.5rem;
+    line-height: 1;
 }
 
 .color-btn:hover {
-    transform: scale(1.1);
+    transform: scale(1.15);
+    filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.3));
 }
 
 .color-btn.active {
-    border-color: #667eea;
-    box-shadow: 0 0 15px rgba(102, 126, 234, 0.5);
+    transform: scale(1.2);
+    filter: drop-shadow(0 0 12px rgba(102, 126, 234, 0.8));
 }
 
 .colorless {
-    border: 3px solid #999;
+    /* Colorless mana styling handled by mana font */
 }
 
 #bracket-filter {
@@ -321,6 +331,17 @@ header h1 {
     border-left: 4px solid #2196f3;
     text-align: left;
     line-height: 1.6;
+}
+
+/* Mana symbol styling in card display */
+.ms-cost {
+    display: inline-block;
+    margin: 0 2px;
+}
+
+.commander-card .ms-cost {
+    font-size: 1.2em;
+    vertical-align: middle;
 }
 
 .swipe-buttons {

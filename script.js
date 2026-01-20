@@ -137,12 +137,13 @@ class MTGCommanderPicker {
                     console.log('Swipe threshold met! Direction:', currentX > 0 ? 'right' : 'left');
                     // Animate card flying off screen
                     const direction = currentX > 0 ? 1 : -1;
+                    const swipeDirection = currentX > 0 ? 'accept' : 'reject'; // Capture direction before reset
                     card.style.transition = 'transform 0.3s ease-out, opacity 0.3s ease-out';
                     card.style.transform = `translate(${direction * 1000}px, ${currentY}px) rotate(${direction * 30}deg)`;
                     card.style.opacity = '0';
                     
                     setTimeout(() => {
-                        if (currentX > 0) {
+                        if (swipeDirection === 'accept') {
                             console.log('Accepting commander');
                             this.acceptCommander();
                         } else {
@@ -217,12 +218,13 @@ class MTGCommanderPicker {
                 if (Math.abs(currentX) > 100) {
                     console.log('Touch swipe threshold met!');
                     const direction = currentX > 0 ? 1 : -1;
+                    const swipeDirection = currentX > 0 ? 'accept' : 'reject'; // Capture direction before reset
                     card.style.transition = 'transform 0.3s ease-out, opacity 0.3s ease-out';
                     card.style.transform = `translate(${direction * 1000}px, ${currentY}px) rotate(${direction * 30}deg)`;
                     card.style.opacity = '0';
                     
                     setTimeout(() => {
-                        if (currentX > 0) {
+                        if (swipeDirection === 'accept') {
                             this.acceptCommander();
                         } else {
                             this.rejectCommander();
@@ -585,18 +587,18 @@ class MTGCommanderPicker {
     }
 
     colorSymbols(colors) {
-        // Convert color letters to mana symbols
+        // Convert color letters to mana symbols using Mana font
         const symbolMap = {
-            'W': '⚪',
-            'U': '🔵',
-            'B': '⚫',
-            'R': '🔴',
-            'G': '🟢',
-            'C': '◯'
+            'W': '<i class="ms ms-w ms-cost ms-shadow"></i>',
+            'U': '<i class="ms ms-u ms-cost ms-shadow"></i>',
+            'B': '<i class="ms ms-b ms-cost ms-shadow"></i>',
+            'R': '<i class="ms ms-r ms-cost ms-shadow"></i>',
+            'G': '<i class="ms ms-g ms-cost ms-shadow"></i>',
+            'C': '<i class="ms ms-c ms-cost ms-shadow"></i>'
         };
         
         if (!colors || colors.length === 0) {
-            return '◯'; // Colorless
+            return '<i class="ms ms-c ms-cost ms-shadow"></i>'; // Colorless
         }
         
         return colors.map(c => symbolMap[c] || c).join('');
@@ -992,25 +994,57 @@ class MTGCommanderPicker {
         
         const edhrecUrl = `https://edhrec.com/commanders/${normalizedName}`;
         
-        try {
-            // Use a CORS proxy to fetch EDHREC data
-            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(edhrecUrl)}`;
-            const response = await fetch(proxyUrl);
-            
-            if (!response.ok) {
-                throw new Error('Failed to fetch EDHREC data');
+        // Try multiple CORS proxies in order of preference
+        const proxies = [
+            { url: 'https://api.cors.lol/?url=', name: 'cors.lol' },
+            { url: 'https://corsproxy.io/?', name: 'corsproxy.io' },
+            { url: 'https://api.allorigins.win/raw?url=', name: 'allorigins' }
+        ];
+        
+        for (const proxy of proxies) {
+            try {
+                console.log(`Trying EDHREC scraping with ${proxy.name}...`);
+                const proxyUrl = proxy.url + encodeURIComponent(edhrecUrl);
+                
+                const response = await fetch(proxyUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+                    }
+                });
+                
+                if (!response.ok) {
+                    console.log(`${proxy.name} returned status ${response.status}, trying next proxy...`);
+                    continue;
+                }
+                
+                const htmlContent = await response.text();
+                
+                if (!htmlContent || htmlContent.length < 100) {
+                    console.log(`${proxy.name} returned empty/invalid content, trying next proxy...`);
+                    continue;
+                }
+                
+                console.log(`Successfully fetched EDHREC data using ${proxy.name}`);
+                
+                // Parse the HTML to extract card recommendations
+                const suggestions = this.parseEDHRECHTML(htmlContent);
+                
+                if (suggestions && Object.keys(suggestions).length > 0) {
+                    return suggestions;
+                }
+                
+                console.log(`${proxy.name} fetched data but parsing failed, trying next proxy...`);
+                
+            } catch (error) {
+                console.log(`${proxy.name} failed:`, error.message);
+                // Continue to next proxy
             }
-            
-            const data = await response.json();
-            const htmlContent = data.contents;
-            
-            // Parse the HTML to extract card recommendations
-            return this.parseEDHRECHTML(htmlContent);
-            
-        } catch (error) {
-            console.error('EDHREC scraping error:', error);
-            return null;
         }
+        
+        // All proxies failed
+        console.log('All EDHREC proxies failed');
+        return null;
     }
 
     parseEDHRECHTML(html) {
@@ -1106,25 +1140,26 @@ class MTGCommanderPicker {
         
         try {
             // Fetch popular cards in commander's colors
-            const colorQuery = colors.length > 0 ? `id:${colors.join('')}` : '';
+            // Use id<= to ensure cards are within the commander's color identity
+            const colorQuery = colors.length > 0 ? `id<=${colors.join('')}` : 'id:C';
             
-            // Ramp spells
-            const rampQuery = `${colorQuery} (o:"search your library for" OR o:"add mana") type:instant OR type:sorcery`;
+            // Ramp spells - search for lands or mana-producing spells
+            const rampQuery = `${colorQuery} (o:"search your library for" OR o:"add mana") (t:instant OR t:sorcery OR t:artifact)`;
             const rampCards = await this.fetchCardsByQuery(rampQuery, 6);
             if (rampCards.length > 0) suggestions['Ramp & Fixing'] = rampCards;
             
             // Removal spells
-            const removalQuery = `${colorQuery} (o:"destroy" OR o:"exile") -type:creature`;
+            const removalQuery = `${colorQuery} (o:"destroy" OR o:"exile") -t:creature (t:instant OR t:sorcery OR t:enchantment)`;
             const removalCards = await this.fetchCardsByQuery(removalQuery, 6);
             if (removalCards.length > 0) suggestions['Removal'] = removalCards;
             
             // Card draw
-            const drawQuery = `${colorQuery} o:"draw" type:instant OR type:sorcery OR type:enchantment`;
+            const drawQuery = `${colorQuery} o:"draw" (t:instant OR t:sorcery OR t:enchantment OR t:artifact)`;
             const drawCards = await this.fetchCardsByQuery(drawQuery, 6);
             if (drawCards.length > 0) suggestions['Card Draw'] = drawCards;
             
             // Creatures
-            const creatureQuery = `${colorQuery} type:creature cmc<=4`;
+            const creatureQuery = `${colorQuery} t:creature cmc<=4`;
             const creatures = await this.fetchCardsByQuery(creatureQuery, 8);
             if (creatures.length > 0) suggestions['Creatures'] = creatures;
             
@@ -1132,10 +1167,25 @@ class MTGCommanderPicker {
             console.error('Error generating Scryfall suggestions:', error);
         }
         
-        // Fallback basic suggestions if API fails
+        // Fallback basic suggestions if API fails - filter by color identity
         if (Object.keys(suggestions).length === 0) {
-            suggestions['Staples'] = ['Sol Ring', 'Command Tower', 'Arcane Signet', 'Swords to Plowshares'];
-            suggestions['Ramp'] = ['Cultivate', 'Kodama\'s Reach', 'Rampant Growth', 'Farseek'];
+            const colorlessStaples = ['Sol Ring', 'Arcane Signet', 'Command Tower', 'Lightning Greaves'];
+            suggestions['Staples'] = colorlessStaples;
+            
+            // Add color-appropriate suggestions
+            if (colors.includes('G')) {
+                suggestions['Ramp'] = ['Cultivate', 'Kodama\'s Reach', 'Rampant Growth', 'Nature\'s Lore'];
+            }
+            if (colors.includes('W')) {
+                suggestions['Removal'] = ['Swords to Plowshares', 'Path to Exile', 'Generous Gift'];
+            }
+            if (colors.includes('U')) {
+                suggestions['Card Draw'] = ['Rhystic Study', 'Mystic Remora', 'Ponder', 'Brainstorm'];
+            }
+            if (colors.includes('B')) {
+                suggestions['Card Draw'] = suggestions['Card Draw'] || [];
+                suggestions['Card Draw'].push('Phyrexian Arena', 'Sign in Blood', 'Night\'s Whisper');
+            }
         }
         
         return suggestions;
